@@ -49,22 +49,24 @@ def run():
     global invalid_counter
     global outer_time
 
-    Re_Button_Pressed = 1
-
     if len(reg) == 0:
         redisPublisher.publish("This is main","yes")
 
     for item in pubsub.listen():
+
+        # --- > TODO: create a loop that only finishes if load complete button is pressed
+
+        
         # These lines here ensure that the regimen main file received from Wireless module is valid
         if type(item['data']) is not int:
             item = str(item['data'], 'utf-8')
             redisPublisher.publish("This is main","yes")
             
             if item == 'waiting': # while the MQTT subscriber is still waiting for regimen from pharmacist
-                if GPIO.input(11) == GPIO.HIGH:
-                    rollforward.run()
+                if GPIO.input(11) == GPIO.HIGH: # Load medication button is pressed
+                    load_cut.rollforward()
 
-                elif GPIO.input(7) == GPIO.HIGH:
+                elif GPIO.input(7) == GPIO.HIGH: # Load complete button is pressed
                     redisPublisher.publish("This is main","Loaded")
                 continue
             
