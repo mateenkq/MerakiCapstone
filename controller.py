@@ -24,6 +24,11 @@ non_adherence = 0 #Non adherence system flag
 invalid_counter = 0 #This counter keeps track of how many invalid regimen is there
 travel_counter = 0 # Keeps track of travel packs...just one for now
 
+DISPENSE = 11
+SNOOZE = 13
+TRAVEL = 7
+LOAD = 11
+LOAD_COMPLETE = 7
 
 
 redisClient = redis.Redis()
@@ -36,9 +41,9 @@ pubsub.subscribe("Interface","wireless")
 def run():
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BOARD)
-    GPIO.setup(11, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining dispense button
-    GPIO.setup(13, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining snooze button
-    GPIO.setup(7, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining travel pack button
+    GPIO.setup(DISPENSE, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining dispense button
+    GPIO.setup(SNOOZE, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining snooze button
+    GPIO.setup(TRAVEL, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining travel pack button
 
     global Snooze_Count
     global temp_time
@@ -49,13 +54,17 @@ def run():
     global invalid_counter
     global outer_time
 
+    while GPIO.input(LOAD_COMPLETE) != GPIO.HIGH:
+        if GPIO.input(LOAD) == GPIO.HIGH: # Load medication button is pressed
+            load_cut.rollforward()
+            
+    redisPublisher.publish("This is main","Loaded")
+
+
     if len(reg) == 0:
         redisPublisher.publish("This is main","yes")
 
     for item in pubsub.listen():
-
-        # --- > TODO: create a loop that only finishes if load complete button is pressed
-
         
         # These lines here ensure that the regimen main file received from Wireless module is valid
         if type(item['data']) is not int:
@@ -63,11 +72,6 @@ def run():
             redisPublisher.publish("This is main","yes")
             
             if item == 'waiting': # while the MQTT subscriber is still waiting for regimen from pharmacist
-                if GPIO.input(11) == GPIO.HIGH: # Load medication button is pressed
-                    load_cut.rollforward()
-
-                elif GPIO.input(7) == GPIO.HIGH: # Load complete button is pressed
-                    redisPublisher.publish("This is main","Loaded")
                 continue
             
             if item == 'new': # indicates that a new regimen is available
@@ -104,7 +108,7 @@ def run():
 
 
     while True:
-        if GPIO.input(7) == GPIO.HIGH:
+        if GPIO.input(TRAVEL) == GPIO.HIGH:
             redisPublisher.publish("This is main", "travel")
             redisPublisher.publish("This is main","Medrun")
             load_cut.run_dispense()
@@ -125,7 +129,7 @@ def run():
             if check_expiry(datetime.datetime.now(), current_reg, TIME_LIMIT):
                 non_adherence = 1
             
-            elif GPIO.input(11) == GPIO.HIGH:
+            elif GPIO.input(DISPENSE) == GPIO.HIGH:
                 # If the user pressed the release button, release medication and go to state 6
                 print('Release Button Pressed')
                 print("Pill is dispensing")
@@ -138,7 +142,7 @@ def run():
                 reg = []
                 break
 
-            elif GPIO.input(13) == GPIO.HIGH:
+            elif GPIO.input(SNOOZE) == GPIO.HIGH:
                 #If the user pressed the snooze button, go to state 7 and snooze
                 if Snooze_Count <=5:
                     #In state 7, the machine will sleep for 30 min unless release button is pressed or time is up
@@ -149,7 +153,7 @@ def run():
                     cur_time = (time.time())//60
                     while cur_time - temp_time < 30: #This while loop handles the case when the machine is snoozing, the snoozing will stop if it reaches 30min of the user pressed the Release Button.
                         cur_time = (time.time())/60
-                        if GPIO.input(11) == GPIO.HIGH: #If the user pressed the release button,break out of the sleep session
+                        if GPIO.input(DISPENSE) == GPIO.HIGH: #If the user pressed the release button,break out of the sleep session
                             break
                 elif Snooze_Count > 5:
                     non_adherence = 1
