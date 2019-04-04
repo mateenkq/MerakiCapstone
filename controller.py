@@ -9,11 +9,16 @@ import os
 import sys
 import RPi.GPIO as GPIO
 from motor_utility import load_cut, nonad_motor
+import threading
+
 print('starting')
 ##time.sleep(20)
 print('ready')
 
-TIME_LIMIT = datetime.timedelta(0, 3600) #Medication dispensing availability time from the point the alarm goes off
+#Medication dispensing availability time from the point the alarm goes off
+#By default it is 3 hours
+# TODO: dynamic snoozing
+TIME_LIMIT = datetime.timedelta(0, 10800) 
 reg = [] #medication regiment holder
 Snooze_Count = 0 #Time that the user pressed the sleep button
 temp_time = 0 #time register for snoozing
@@ -38,12 +43,66 @@ pubsub = redisClient.pubsub()
 pubsub.subscribe("Interface","wireless")
 
 
+
+def listen():
+    global Snooze_Count
+    global temp_time
+    global release
+    global right_time
+    global non_adherence
+    global reg
+    global invalid_counter
+    global outer_time
+
+
+    if len(reg) == 0:
+        redisPublisher.publish("This is main","yes")
+    try:
+        for item in pubsub.listen():
+            # These lines here ensure that the regimen main file received from Wireless module is valid
+            if type(item['data']) is not int:
+                item = str(item['data'], 'utf-8')
+                if len(reg) == 0:
+                    redisPublisher.publish("This is main","yes")
+                
+                if item == 'waiting': # while the MQTT subscriber is still waiting for regimen from pharmacist
+                    continue
+                
+                if item == 'new': # indicates that a new regimen is available
+                    print('new')
+                    redisPublisher.publish("This is main","yes")
+                    continue
+                
+                redisPublisher.publish("This is main","next:" + item)
+                temp_reg = item.split()
+                print('Medication Regimen Received')
+                
+                if validate(int(temp_reg[0]), int(temp_reg[1]), int(temp_reg[2]), int(temp_reg[3]), int(temp_reg[4]), TIME_LIMIT) == 'N':
+                    print('Medication Regimen is invalid')
+                    invalid_counter += 1
+                    redisPublisher.publish("This is main", "invalid")
+    ##                break
+                else:
+                    print('Medication Regimen is valid')
+                    reg = temp_reg
+                    if invalid_counter > 0:
+                        non_adherence = 1
+                    redisPublisher.publish("This is main", "valid")
+                    print(reg)
+    ##                break
+                
+            else:
+                continue
+    except KeyboardInterrupt:
+        pass
+
+
 def run():
-    GPIO.setwarnings(False)
-    GPIO.setmode(GPIO.BOARD)
-    GPIO.setup(DISPENSE, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining dispense button
-    GPIO.setup(SNOOZE, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining snooze button
-    GPIO.setup(TRAVEL, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining travel pack button
+##    GPIO.setwarnings(False)
+##    GPIO.setmode(GPIO.BOARD)
+##    GPIO.setup(DISPENSE, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining dispense button
+##    GPIO.setup(SNOOZE, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining snooze button
+##    GPIO.setup(TRAVEL, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining travel pack button
 
     global Snooze_Count
     global temp_time
@@ -54,69 +113,83 @@ def run():
     global invalid_counter
     global outer_time
 
-    while GPIO.input(LOAD_COMPLETE) != GPIO.HIGH:
-        if GPIO.input(LOAD) == GPIO.HIGH: # Load medication button is pressed
-            load_cut.rollforward()
-            
-    redisPublisher.publish("This is main","Loaded")
 
 
-    if len(reg) == 0:
-        redisPublisher.publish("This is main","yes")
-
-    for item in pubsub.listen():
-        
-        # These lines here ensure that the regimen main file received from Wireless module is valid
-        if type(item['data']) is not int:
-            item = str(item['data'], 'utf-8')
-            redisPublisher.publish("This is main","yes")
-            
-            if item == 'waiting': # while the MQTT subscriber is still waiting for regimen from pharmacist
-                continue
-            
-            if item == 'new': # indicates that a new regimen is available
-                print('new')
-                redisPublisher.publish("This is main","yes")
-                continue
-            
-            redisPublisher.publish("This is main","next:" + item)
-            reg = item.split()
-            print('Medication Regimen Received')
-            
-            if validate(int(reg[0]), int(reg[1]), int(reg[2]), int(reg[3]), int(reg[4]), TIME_LIMIT) == 'N':
-                print('Medication Regimen is invalid')
-                invalid_counter += 1
-                redisPublisher.publish("This is main", "invalid")
+##    if len(reg) == 0:
+##        redisPublisher.publish("This is main","yes")
+##
+##    for item in pubsub.listen():
+##        
+##        # These lines here ensure that the regimen main file received from Wireless module is valid
+##        if type(item['data']) is not int:
+##            item = str(item['data'], 'utf-8')
+##            redisPublisher.publish("This is main","yes")
+##            
+##            if item == 'waiting': # while the MQTT subscriber is still waiting for regimen from pharmacist
+##                continue
+##            
+##            if item == 'new': # indicates that a new regimen is available
+##                print('new')
+##                redisPublisher.publish("This is main","yes")
+##                continue
+##            
+##            redisPublisher.publish("This is main","next:" + item)
+##            reg = item.split()
+##            print('Medication Regimen Received')
+##            
+##            if validate(int(reg[0]), int(reg[1]), int(reg[2]), int(reg[3]), int(reg[4]), TIME_LIMIT) == 'N':
+##                print('Medication Regimen is invalid')
+##                invalid_counter += 1
+##                redisPublisher.publish("This is main", "invalid")
+####                break
+##            else:
+##                print('Medication Regimen is valid')
+##                redisPublisher.publish("This is main", "valid")
+##                print(reg)
 ##                break
-            else:
-                print('Medication Regimen is valid')
-                redisPublisher.publish("This is main", "valid")
-                print(reg)
-                break
-            
-        else:
-            continue
+##            
+##        else:
+##            continue
 
-    while invalid_counter > 0:
-        redisPublisher.publish("This is main","discarding")
-        #These lines storages all the missed medication into the storage space
-        print('Activate the non-adherence mechanism for invalid medication')
-        nonad_motor.run_forward()
-        load_cut.run_dispense()
-        nonad_motor.run_backward()
-        invalid_counter -= 1
+##    while invalid_counter > 0:
+##        redisPublisher.publish("This is main","discarding")
+##        #These lines storages all the missed medication into the storage space
+##        print('Activate the non-adherence mechanism for invalid medication')
+##        nonad_motor.run_forward()
+##        load_cut.run_dispense()
+##        nonad_motor.run_backward()
+##        invalid_counter -= 1
 
 
     while True:
+        ##start new
+        while invalid_counter > 0:
+            while non_adherence == 1:
+                redisPublisher.publish("This is main","discarding")
+                #These lines storages all the missed medication into the storage space
+                print('Activate the non-adherence mechanism for invalid medication')
+                nonad_motor.run_forward()
+                load_cut.run_dispense()
+                nonad_motor.run_backward()
+                invalid_counter -= 1
+                redisPublisher.publish("This is main","Nonad-run") #send the non-adherence data
+                if invalid_counter == 0:
+                    non_adherence = 0  #Reset the non adherence flag
+
+        ##finish new
+
+        
         if GPIO.input(TRAVEL) == GPIO.HIGH:
             redisPublisher.publish("This is main", "travel")
             redisPublisher.publish("This is main","Medrun")
             load_cut.run_dispense()
             release = 0 # Set the release flag back to 0
             reg = []
-            break
-            
-        current_reg = datetime.datetime(*[int(i) for i in reg])
+##            break
+
+        current_reg = datetime.datetime(2099,12, 31)
+        if len(reg) > 0:
+            current_reg = datetime.datetime(*[int(i) for i in reg])
         if datetime.datetime.now() > current_reg:
             redisPublisher.publish("This is main","can_dispense")
             release = 1
@@ -140,7 +213,7 @@ def run():
                 non_adherence = 0
                 release = 0 # Set the release flag back to 0
                 reg = []
-                break
+##                break
 
             elif GPIO.input(SNOOZE) == GPIO.HIGH:
                 #If the user pressed the snooze button, go to state 7 and snooze
@@ -171,11 +244,23 @@ def run():
                 non_adherence = 0  #Reset the non adherence flag
                 reg = [] #Clear the regimen
                 release = 0
-                break
+##                break
 
 
 while True:
+    GPIO.setwarnings(False)
+    GPIO.setmode(GPIO.BOARD)
+    GPIO.setup(DISPENSE, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining dispense button
+    GPIO.setup(SNOOZE, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining snooze button
+    GPIO.setup(TRAVEL, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining travel pack button
     try:
+        while GPIO.input(LOAD_COMPLETE) != GPIO.HIGH:
+            if GPIO.input(LOAD) == GPIO.HIGH: # Load medication button is pressed
+                load_cut.rollforward()
+        redisPublisher.publish("This is main","Loaded")
+        time.sleep(3)
+        listen_thread = threading.Thread(target=listen)
+        listen_thread.start()
         run()
     except KeyboardInterrupt:
         break

@@ -72,7 +72,7 @@ class motor_driver_nonad:
         ##    m.MotorSpeedSetAB(0,0)
             self.StepperMotorUnenable()
 
-        ##    time.sleep(2)
+        ##    time.sleep(2)  
 
         def run_backward(self):
             
@@ -86,5 +86,5 @@ class motor_driver_nonad:
             time.sleep(1)
 
 nonad_motor = motor_driver_nonad(address=0x04)
-##m.run_forward()
-##m.run_backward()
+##nonad_motor.run_forward()
+##nonad_motor.run_backward()

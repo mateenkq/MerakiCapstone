@@ -69,7 +69,7 @@ class motor_driver_load_cut:
             my_lcs = EasyLightColorSensor(led_state = True)
             def is_black():
                 red, green, blue, clear = my_lcs.safe_raw_colors()
-                print(sum([red, green, blue]) / 3)
+##                print(sum([red, green, blue]) / 3)
                 #Print the values
                 return sum([red, green, blue]) / 3 < 0.035
             time.sleep(.05)
