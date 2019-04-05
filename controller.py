@@ -172,7 +172,7 @@ def run():
                 load_cut.run_dispense()
                 nonad_motor.run_backward()
                 invalid_counter -= 1
-                redisPublisher.publish("This is main","Nonad-run") #send the non-adherence data
+##                redisPublisher.publish("This is main","Nonad-run") #send the non-adherence data
                 if invalid_counter == 0:
                     non_adherence = 0  #Reset the non adherence flag
 

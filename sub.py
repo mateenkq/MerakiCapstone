@@ -5,6 +5,7 @@ import redis
 import time
 import json
 import ast
+import threading
 from datetime import date, datetime, timedelta
 from sub_utility import parse_input, output_times
 
@@ -13,6 +14,7 @@ client = None
 #Allow time at startup so that network connection is established
 ##time.sleep(15)
 
+lock = threading.Lock()
 
 #Set up the redis subscriber to main thru pubsub and set up a redis publisher (redisClient)
 redisClient = redis.Redis()
@@ -26,7 +28,7 @@ input_dict = {'period':'', 'times':[], 'dosages':0}
 
 #TODO --- > If NEW_REGIMEN is True, then input dict will be reinitialized
 NEW_REGIMEN = False
-
+Connected = False
 
 result = None
 missed = None # the number of meds missed
@@ -35,10 +37,11 @@ taken = None # the number of meds taken at the right time
 # old data may be stored in onboard memory. See if it's there, if not initialize missed and taken
 # to be 0
 try:
-    fh = open('/home/pi/Dexter/GrovePi/Software/Python/grove_i2c_motor_driver/m8/data.json', 'r')
+    fh = open('data.json', 'r')
     data = json.load(fh)
     missed = data['meds_missed']
     taken = data['meds_taken']
+    result = data['reg']
     fh.close()
 except FileNotFoundError:
     missed = 0
@@ -79,7 +82,10 @@ def on_message(client, userdata, message):
     Carry out the following tasks when a message from the Tago platform is received
     
     """
+    
     global result
+    global input_dict
+
     NEW_REGIMEN = True # ---> not doing anything yet, make it useful
 
     # convert incoming message to a string
@@ -108,7 +114,11 @@ def on_message(client, userdata, message):
         if len(input_dict['times']) == int(input_dict['dosages']):
             
             start, end, list_of_times = parse_input(input_dict)
-            result = output_times(start, end, list_of_times)
+            print('result is {}'.format(result))
+            with lock:
+                result = output_times(start, end, list_of_times)
+            print('result is {}'.format(result))
+            input_dict = {'period':'', 'times':[], 'dosages':0}
             send_msg = {
                 'variable': "recv_data",
                 'value': "Yes"
@@ -159,19 +169,21 @@ def on_message(client, userdata, message):
         }
         client.publish("tago/data/post", payload=json.dumps(send_msg))
 
-
-if __name__ == "__main__":
+client = mqttClient.Client("Python")
+def mqtt_listen():
     """
     Set up the MQTT broker and establish a connetion to Tago
     
     """
-    Connected = False
+    print('passed')
+    global Connected
+    global client
+    
     broker_address = "mqtt.tago.io"
     port = 1883
     user="any"
     password="c0664269-298e-45b7-a5c5-5d2af1912363"
 
-    client = mqttClient.Client("Python")
     client.username_pw_set(user, password=password)
     client.on_connect = on_connect
     client.on_message = on_message
@@ -179,12 +191,23 @@ if __name__ == "__main__":
 
     client.connect(broker_address, port=port)
     client.subscribe("tago/test")
-    client.loop_start()
+    client.loop_forever()
+    while Connected != True:
+        time.sleep(0.1)
+    
+if __name__ == "__main__":
+
+##    except KeyboardInterrupt:
+##        client.disconnect()
+##        client.loop_stop()
+##        break
 
     """
     Set up the MQTT broker and establish a connetion to Tago
     
     """
+    listen_thread = threading.Thread(target=mqtt_listen)
+    listen_thread.start()
 
     while True:
         try:
@@ -210,7 +233,8 @@ if __name__ == "__main__":
                                 if item == 'invalid':
 
                                     missed += 1
-                                    result.pop(0)
+                                    with lock:
+                                        result.pop(0)
                                     adherence_msg = {
                                         'variable':'meds_missed',
                                         'value':missed
@@ -219,9 +243,10 @@ if __name__ == "__main__":
 
                                     local_msg = {
                                         'meds_missed':missed,
-                                        'meds_taken':taken
+                                        'meds_taken':taken,
+                                        'reg':result
                                         }
-                                    with open('/home/pi/Dexter/GrovePi/Software/Python/grove_i2c_motor_driver/m8/data.json', 'w') as outfile:
+                                    with open('data.json', 'w') as outfile:
                                         json.dump(local_msg, outfile)
                                         outfile.close()
 
@@ -238,7 +263,8 @@ if __name__ == "__main__":
                            
                     elif item == 'Nonad-run':
                         missed += 1
-                        result.pop(0)
+                        with lock:
+                            result.pop(0)
                         adherence_msg = {
                             'variable':'meds_missed',
                             'value':missed
@@ -247,14 +273,16 @@ if __name__ == "__main__":
 
                         local_msg = {
                             'meds_missed':missed,
-                            'meds_taken':taken
+                            'meds_taken':taken,
+                            'reg':result
                             }
-                        with open('/home/pi/Dexter/GrovePi/Software/Python/grove_i2c_motor_driver/m8/data.json', 'w') as outfile:
+                        with open('data.json', 'w') as outfile:
                             json.dump(local_msg, outfile)
                             outfile.close()
                     elif item == 'Medrun':
                         taken += 1
-                        result.pop(0)
+                        with lock:
+                            result.pop(0)
                         adherence_msg = {
                             'variable':'meds_taken',
                             'value':taken
@@ -262,24 +290,23 @@ if __name__ == "__main__":
                         client.publish('tago/data/post', payload=json.dumps(adherence_msg))
                         local_msg = {
                             'meds_missed':missed,
-                            'meds_taken':taken
+                            'meds_taken':taken,
+                            'reg':result
                             }
-                        with open('/home/pi/Dexter/GrovePi/Software/Python/grove_i2c_motor_driver/m8/data.json', 'w') as outfile:
+                        with open('data.json', 'w') as outfile:
                             json.dump(local_msg, outfile)
                             outfile.close()
                     
                     elif item == 'no':
                         pass
         except KeyboardInterrupt:
-            client.disconnect()
-            client.loop_stop()
+##            client.disconnect()
+##            client.loop_stop()
             break
 
-        while Connected != True:
-            time.sleep(0.1)
 
 
 
-    print("exiting")
-    client.disconnect()
-    client.loop_stop()
+##    print("exiting")
+##    client.disconnect()
+##    client.loop_stop()
