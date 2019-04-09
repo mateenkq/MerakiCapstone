@@ -84,7 +84,7 @@ class MyApp(threading.Thread):
 def main():    
     root = Tk()
     helv36 = tkinter.font.Font(family='Helvetica', size=70, weight='bold')
-    root.attributes('-fullscreen', True)
+##    root.attributes('-fullscreen', True)
     guistr = StringVar()
     x1 = Label(root, textvariable=guistr)
     x1.config(font=('Helvetica',20,'bold'))

@@ -119,11 +119,11 @@ def on_message(client, userdata, message):
                 result = output_times(start, end, list_of_times)
             print('result is {}'.format(result))
             input_dict = {'period':'', 'times':[], 'dosages':0}
-            send_msg = {
-                'variable': "recv_data",
-                'value': "Yes"
-            }
-            client.publish("tago/data/post", payload=json.dumps(send_msg))
+##            send_msg = {
+##                'variable': "recv_data",
+##                'value': "Yes"
+##            }
+##            client.publish("tago/data/post", payload=json.dumps(send_msg))
 
 
             #reinitialize taken and missed meds
@@ -143,10 +143,12 @@ def on_message(client, userdata, message):
 
             send_msg = {
                 'variable': 'dosages_match',
-                'value': 'Success!'
+##                'value': 'Success!'
+                'value':'.'
             }
             redisClient.publish("wireless", 'new')
-            client.publish("tago/data/post", payload=json.dumps(send_msg))
+            for i in range(5):
+                client.publish("tago/data/post", payload=json.dumps(send_msg))
 
             send_msg = {
                 'variable': "meds_loaded",
@@ -226,7 +228,10 @@ if __name__ == "__main__":
                     
                         
                     if item == 'yes' and result is not None:
-                        redisClient.publish("wireless", result[0])
+                        if len(result) > 1:
+                            redisClient.publish("wireless", result[0]+":"+result[1])
+                        else:
+                            redisClient.publish("wireless", result[0])
                         for item in pubsub.listen():
                             if type(item['data']) is not int:
                                 item = str(item['data'], 'utf-8')
@@ -235,6 +240,8 @@ if __name__ == "__main__":
                                     missed += 1
                                     with lock:
                                         result.pop(0)
+                                        if len(result) == 0:
+                                            redisClient.publish("wireless", "finished")
                                     adherence_msg = {
                                         'variable':'meds_missed',
                                         'value':missed
@@ -265,6 +272,8 @@ if __name__ == "__main__":
                         missed += 1
                         with lock:
                             result.pop(0)
+                            if len(result) == 0:
+                                redisClient.publish("wireless", "finished")
                         adherence_msg = {
                             'variable':'meds_missed',
                             'value':missed
@@ -283,6 +292,8 @@ if __name__ == "__main__":
                         taken += 1
                         with lock:
                             result.pop(0)
+                            if len(result) == 0:
+                                redisClient.publish("wireless", "finished")
                         adherence_msg = {
                             'variable':'meds_taken',
                             'value':taken

@@ -20,6 +20,7 @@ print('ready')
 # TODO: dynamic snoozing
 TIME_LIMIT = datetime.timedelta(0, 10800) 
 reg = [] #medication regiment holder
+later_reg = None #the regimen after the next one
 Snooze_Count = 0 #Time that the user pressed the sleep button
 temp_time = 0 #time register for snoozing
 outer_time = 0 #time register for the overall period
@@ -28,6 +29,7 @@ release = 0 #Time to release flag
 non_adherence = 0 #Non adherence system flag
 invalid_counter = 0 #This counter keeps track of how many invalid regimen is there
 travel_counter = 0 # Keeps track of travel packs...just one for now
+finished = False
 
 DISPENSE = 11
 SNOOZE = 13
@@ -53,14 +55,20 @@ def listen():
     global reg
     global invalid_counter
     global outer_time
-
+    global later_reg
+    global finished
 
     if len(reg) == 0:
         redisPublisher.publish("This is main","yes")
     try:
         for item in pubsub.listen():
+            print(item)
             # These lines here ensure that the regimen main file received from Wireless module is valid
             if type(item['data']) is not int:
+                if item == 'finished':
+                    finished = True
+                    reg = []
+                    break
                 item = str(item['data'], 'utf-8')
                 if len(reg) == 0:
                     redisPublisher.publish("This is main","yes")
@@ -70,11 +78,24 @@ def listen():
                 
                 if item == 'new': # indicates that a new regimen is available
                     print('new')
-                    redisPublisher.publish("This is main","yes")
-                    continue
-                
-                redisPublisher.publish("This is main","next:" + item)
-                temp_reg = item.split()
+                    reg = []
+                    finished = True
+                    break
+##                    redisPublisher.publish("This is main","yes")
+##                    continue
+
+                next_dosage, next_x_2 = None, None
+                regs = item.split(":")
+                if len(regs) > 1:
+                    next_dosage = regs[0]
+                    next_x_2 = regs[1]
+                    later_reg = next_x_2.split()
+                else:
+                    next_dosage = regs[0]
+                    next_x_2 = None
+                    later_reg = None
+                redisPublisher.publish("This is main","next:" + next_dosage)
+                temp_reg = next_dosage.split()
                 print('Medication Regimen Received')
                 
                 if validate(int(temp_reg[0]), int(temp_reg[1]), int(temp_reg[2]), int(temp_reg[3]), int(temp_reg[4]), TIME_LIMIT) == 'N':
@@ -112,6 +133,8 @@ def run():
     global reg
     global invalid_counter
     global outer_time
+    global later_reg
+    global finished
 
 
 
@@ -161,7 +184,7 @@ def run():
 ##        invalid_counter -= 1
 
 
-    while True:
+    while finished == False:
         ##start new
         while invalid_counter > 0:
             while non_adherence == 1:
@@ -185,6 +208,7 @@ def run():
             load_cut.run_dispense()
             release = 0 # Set the release flag back to 0
             reg = []
+            redisPublisher.publish("This is main","yes")
 ##            break
 
         current_reg = datetime.datetime(2099,12, 31)
@@ -192,58 +216,77 @@ def run():
             current_reg = datetime.datetime(*[int(i) for i in reg])
         if datetime.datetime.now() > current_reg:
             redisPublisher.publish("This is main","can_dispense")
-            release = 1
-
+            if release == 0:
+                release = 1
+                os.system("mpg123 http://ice1.somafm.com/u80s-128-mp3 &")
+                
         if release == 1:
+            time_to_next = TIME_LIMIT
+            if later_reg is not None:
+                next_time = datetime.datetime(*[int(i) for i in later_reg])
+                time_to_next = next_time - current_reg
+
+            current_limit = min(TIME_LIMIT, time_to_next)
             outer_time = (time.time())//60
             #Alarm the User
             #Now it is in state 5
 
-            if check_expiry(datetime.datetime.now(), current_reg, TIME_LIMIT):
+            snooze_time = current_limit/6
+            if check_expiry(datetime.datetime.now(), current_reg, current_limit):
                 non_adherence = 1
             
             elif GPIO.input(DISPENSE) == GPIO.HIGH:
                 # If the user pressed the release button, release medication and go to state 6
                 print('Release Button Pressed')
                 print("Pill is dispensing")
-
+                os.system('killall -9 mpg123')
                 redisPublisher.publish("This is main","dispensing")
                 load_cut.run_dispense()
                 redisPublisher.publish("This is main","Medrun")
                 non_adherence = 0
                 release = 0 # Set the release flag back to 0
                 reg = []
+                redisPublisher.publish("This is main","yes")
+                Snooze_Count = 0
 ##                break
 
             elif GPIO.input(SNOOZE) == GPIO.HIGH:
                 #If the user pressed the snooze button, go to state 7 and snooze
-                if Snooze_Count <=5:
+                if Snooze_Count <= 6:
                     #In state 7, the machine will sleep for 30 min unless release button is pressed or time is up
                     Snooze_Count += 1
                     print('Snooze Button Pressed')
-                    redisPublisher.publish("This is main","snooze:"+str(5-Snooze_Count))
-                    temp_time = (time.time())//60
-                    cur_time = (time.time())//60
-                    while cur_time - temp_time < 30: #This while loop handles the case when the machine is snoozing, the snoozing will stop if it reaches 30min of the user pressed the Release Button.
-                        cur_time = (time.time())/60
+                    os.system('killall -9 mpg123')
+                    redisPublisher.publish("This is main","snooze:"+str(6-Snooze_Count))
+##                    temp_time = (time.time())//60
+##                    cur_time = (time.time())//60
+                    temp_time = datetime.datetime.now()
+                    cur_time = datetime.datetime.now()
+                    while (cur_time - temp_time < snooze_time) and check_expiry(datetime.datetime.now(), current_reg, current_limit) == False: #This while loop handles the case when the machine is snoozing, the snoozing will stop if it reaches 30min of the user pressed the Release Button.
+                        cur_time = datetime.datetime.now()
                         if GPIO.input(DISPENSE) == GPIO.HIGH: #If the user pressed the release button,break out of the sleep session
                             break
-                elif Snooze_Count > 5:
+                    if GPIO.input(DISPENSE) != GPIO.HIGH:
+                        os.system("mpg123 http://ice1.somafm.com/u80s-128-mp3 &")
+                elif Snooze_Count > 6:
                     non_adherence = 1
                     release = 0
 
 
             if non_adherence == 1:
+                Snooze_Count = 0
                 #If the non adherence flag is turned on,store the medication in the non-adherence storage space
                 print('Activate the non-adherence mechanism')
+                os.system('killall -9 mpg123')
                 nonad_motor.run_forward()
                 load_cut.run_dispense()
                 nonad_motor.run_backward()
-                data_logger[str(str(time.asctime()))] = 'not adhere' #store the data logger in the dictionary
+##                data_logger[str(str(time.asctime()))] = 'not adhere' #store the data logger in the dictionary
                 redisPublisher.publish("This is main","Nonad-run") #send the non-adherence data
                 non_adherence = 0  #Reset the non adherence flag
                 reg = [] #Clear the regimen
                 release = 0
+                redisPublisher.publish("This is main","yes")
 ##                break
 
 
@@ -258,6 +301,7 @@ while True:
             if GPIO.input(LOAD) == GPIO.HIGH: # Load medication button is pressed
                 load_cut.rollforward()
         redisPublisher.publish("This is main","Loaded")
+        finished = False
         time.sleep(3)
         listen_thread = threading.Thread(target=listen)
         listen_thread.start()
