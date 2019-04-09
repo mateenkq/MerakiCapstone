@@ -214,6 +214,7 @@ if __name__ == "__main__":
     while True:
         try:
             for item in pubsub.listen():
+                print(item)
                 if type(item['data']) is not int:
                     item = str(item['data'],'utf-8')
                     if item == 'Loaded':
@@ -222,9 +223,10 @@ if __name__ == "__main__":
                             'value': "Meds Have been loaded. Please send regimen to patient."
                         }
                         client.publish("tago/data/post", payload=json.dumps(send_msg))
-                    if item == 'Travel':
+                    if item == 'travel':
                         if result is not None and len(result) > 0:
                             redisClient.publish("wireless", 'travel-ok')
+                            print('sending travel-ok')
                     if result == None or len(result) == 0:
                         redisClient.publish("wireless", 'waiting')
                         continue
@@ -263,6 +265,7 @@ if __name__ == "__main__":
                                         redisClient.publish("wireless", result[0])
                                         continue
                                     elif item == 'valid':
+                                        print('breaking')
                                         break
         
                         elif len(result) == 1:

@@ -77,6 +77,7 @@ def listen():
                     redisPublisher.publish("This is main","yes")
                 if item == 'travel-ok':
                     TRAVEL_ALLOWED = True
+                    continue
                     
                 if item == 'waiting': # while the MQTT subscriber is still waiting for regimen from pharmacist
                     continue
