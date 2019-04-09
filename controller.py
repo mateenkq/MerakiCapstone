@@ -30,6 +30,7 @@ non_adherence = 0 #Non adherence system flag
 invalid_counter = 0 #This counter keeps track of how many invalid regimen is there
 travel_counter = 0 # Keeps track of travel packs...just one for now
 finished = False
+TRAVEL_ALLOWED = False
 
 DISPENSE = 11
 SNOOZE = 13
@@ -57,6 +58,7 @@ def listen():
     global outer_time
     global later_reg
     global finished
+    global TRAVEL_ALLOWED
 
     if len(reg) == 0:
         redisPublisher.publish("This is main","yes")
@@ -65,24 +67,27 @@ def listen():
             print(item)
             # These lines here ensure that the regimen main file received from Wireless module is valid
             if type(item['data']) is not int:
+                item = str(item['data'], 'utf-8')
                 if item == 'finished':
                     finished = True
                     reg = []
+                    redisPublisher.publish("This is main","finished")
                     break
-                item = str(item['data'], 'utf-8')
                 if len(reg) == 0:
                     redisPublisher.publish("This is main","yes")
-                
+                if item == 'travel-ok':
+                    TRAVEL_ALLOWED = True
+                    
                 if item == 'waiting': # while the MQTT subscriber is still waiting for regimen from pharmacist
                     continue
                 
                 if item == 'new': # indicates that a new regimen is available
                     print('new')
-                    reg = []
-                    finished = True
-                    break
-##                    redisPublisher.publish("This is main","yes")
-##                    continue
+##                    reg = []
+##                    finished = True
+##                    break
+                    redisPublisher.publish("This is main","yes")
+                    continue
 
                 next_dosage, next_x_2 = None, None
                 regs = item.split(":")
@@ -135,6 +140,7 @@ def run():
     global outer_time
     global later_reg
     global finished
+    global TRAVEL_ALLOWED
 
 
 
@@ -204,11 +210,15 @@ def run():
         
         if GPIO.input(TRAVEL) == GPIO.HIGH:
             redisPublisher.publish("This is main", "travel")
-            redisPublisher.publish("This is main","Medrun")
-            load_cut.run_dispense()
-            release = 0 # Set the release flag back to 0
-            reg = []
-            redisPublisher.publish("This is main","yes")
+            time.sleep(1)
+            if TRAVEL_ALLOWED == True:
+                redisPublisher.publish("This is main", "dispense-travel")
+                redisPublisher.publish("This is main","Medrun")
+                load_cut.run_dispense()
+                release = 0 # Set the release flag back to 0
+                reg = []
+                TRAVEL_ALLOWED = False
+                redisPublisher.publish("This is main","yes")
 ##            break
 
         current_reg = datetime.datetime(2099,12, 31)

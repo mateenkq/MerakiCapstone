@@ -117,38 +117,38 @@ def on_message(client, userdata, message):
             print('result is {}'.format(result))
             with lock:
                 result = output_times(start, end, list_of_times)
-            print('result is {}'.format(result))
-            input_dict = {'period':'', 'times':[], 'dosages':0}
-##            send_msg = {
-##                'variable': "recv_data",
-##                'value': "Yes"
-##            }
-##            client.publish("tago/data/post", payload=json.dumps(send_msg))
+                print('result is {}'.format(result))
+                input_dict = {'period':'', 'times':[], 'dosages':0}
+    ##            send_msg = {
+    ##                'variable': "recv_data",
+    ##                'value': "Yes"
+    ##            }
+    ##            client.publish("tago/data/post", payload=json.dumps(send_msg))
 
 
-            #reinitialize taken and missed meds
+                #reinitialize taken and missed meds
 
-            
-            adherence_msg = {
-                'variable':'meds_taken',
-                'value':taken
+                
+                adherence_msg = {
+                    'variable':'meds_taken',
+                    'value':taken
+                    }
+                client.publish('tago/data/post', payload=json.dumps(adherence_msg))
+
+                adherence_msg = {
+                    'variable':'meds_missed',
+                    'value':missed
+                    }
+                client.publish('tago/data/post', payload=json.dumps(adherence_msg))
+
+                send_msg = {
+                    'variable': 'dosages_match',
+    ##                'value': 'Success!'
+                    'value':'.'
                 }
-            client.publish('tago/data/post', payload=json.dumps(adherence_msg))
-
-            adherence_msg = {
-                'variable':'meds_missed',
-                'value':missed
-                }
-            client.publish('tago/data/post', payload=json.dumps(adherence_msg))
-
-            send_msg = {
-                'variable': 'dosages_match',
-##                'value': 'Success!'
-                'value':'.'
-            }
-            redisClient.publish("wireless", 'new')
-            for i in range(5):
-                client.publish("tago/data/post", payload=json.dumps(send_msg))
+                redisClient.publish("wireless", 'new')
+                for i in range(5):
+                    client.publish("tago/data/post", payload=json.dumps(send_msg))
 
             send_msg = {
                 'variable': "meds_loaded",
@@ -222,46 +222,114 @@ if __name__ == "__main__":
                             'value': "Meds Have been loaded. Please send regimen to patient."
                         }
                         client.publish("tago/data/post", payload=json.dumps(send_msg))
-                    if result == None:
+                    if item == 'Travel':
+                        if result is not None and len(result) > 0:
+                            redisClient.publish("wireless", 'travel-ok')
+                    if result == None or len(result) == 0:
                         redisClient.publish("wireless", 'waiting')
                         continue
                     
                         
-                    if item == 'yes' and result is not None:
+                    if item == 'yes' and result is not None and len(result) > 0:
                         if len(result) > 1:
                             redisClient.publish("wireless", result[0]+":"+result[1])
-                        else:
+                            for item in pubsub.listen():
+                                if type(item['data']) is not int:
+                                    item = str(item['data'], 'utf-8')
+                                    if item == 'invalid':
+
+                                        missed += 1
+                                        with lock:
+                                            result.pop(0)
+                                            if len(result) == 0:
+                                                redisClient.publish("wireless", "finished")
+                                                break
+                                        adherence_msg = {
+                                            'variable':'meds_missed',
+                                            'value':missed
+                                            }
+                                        client.publish('tago/data/post', payload=json.dumps(adherence_msg))
+
+                                        local_msg = {
+                                            'meds_missed':missed,
+                                            'meds_taken':taken,
+                                            'reg':result
+                                            }
+                                        with open('data.json', 'w') as outfile:
+                                            json.dump(local_msg, outfile)
+                                            outfile.close()
+
+                                            
+                                        redisClient.publish("wireless", result[0])
+                                        continue
+                                    elif item == 'valid':
+                                        break
+        
+                        elif len(result) == 1:
                             redisClient.publish("wireless", result[0])
-                        for item in pubsub.listen():
-                            if type(item['data']) is not int:
-                                item = str(item['data'], 'utf-8')
-                                if item == 'invalid':
+                            for item in pubsub.listen():
+                                if type(item['data']) is not int:
+                                    item = str(item['data'], 'utf-8')
+                                    if item == 'invalid':
 
-                                    missed += 1
-                                    with lock:
-                                        result.pop(0)
-                                        if len(result) == 0:
-                                            redisClient.publish("wireless", "finished")
-                                    adherence_msg = {
-                                        'variable':'meds_missed',
-                                        'value':missed
-                                        }
-                                    client.publish('tago/data/post', payload=json.dumps(adherence_msg))
+                                        missed += 1
+                                        with lock:
+                                            result.pop(0)
+                                            if len(result) == 0:
+                                                redisClient.publish("wireless", "finished")
+                                                break
+                                        adherence_msg = {
+                                            'variable':'meds_missed',
+                                            'value':missed
+                                            }
+                                        client.publish('tago/data/post', payload=json.dumps(adherence_msg))
 
-                                    local_msg = {
-                                        'meds_missed':missed,
-                                        'meds_taken':taken,
-                                        'reg':result
-                                        }
-                                    with open('data.json', 'w') as outfile:
-                                        json.dump(local_msg, outfile)
-                                        outfile.close()
+                                        local_msg = {
+                                            'meds_missed':missed,
+                                            'meds_taken':taken,
+                                            'reg':result
+                                            }
+                                        with open('data.json', 'w') as outfile:
+                                            json.dump(local_msg, outfile)
+                                            outfile.close()
 
-                                        
-                                    redisClient.publish("wireless", result[0])
-                                    continue
-                                elif item == 'valid':
-                                    break
+                                            
+                                        redisClient.publish("wireless", result[0])
+                                        continue
+                                    elif item == 'valid':
+                                        break
+                        else:
+                            redisClient.publish("wireless", "finished")
+##                        for item in pubsub.listen():
+##                            if type(item['data']) is not int:
+##                                item = str(item['data'], 'utf-8')
+##                                if item == 'invalid':
+##
+##                                    missed += 1
+##                                    with lock:
+##                                        result.pop(0)
+##                                        if len(result) == 0:
+##                                            redisClient.publish("wireless", "finished")
+##                                    adherence_msg = {
+##                                        'variable':'meds_missed',
+##                                        'value':missed
+##                                        }
+##                                    client.publish('tago/data/post', payload=json.dumps(adherence_msg))
+##
+##                                    local_msg = {
+##                                        'meds_missed':missed,
+##                                        'meds_taken':taken,
+##                                        'reg':result
+##                                        }
+##                                    with open('data.json', 'w') as outfile:
+##                                        json.dump(local_msg, outfile)
+##                                        outfile.close()
+##
+##                                        
+##                                    redisClient.publish("wireless", result[0])
+##                                    continue
+##                                elif item == 'valid':
+##                                    break
                         send_msg = {
                             'variable': "recv_data",
                             'value': " "

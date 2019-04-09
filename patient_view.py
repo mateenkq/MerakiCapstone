@@ -65,10 +65,15 @@ class MyApp(threading.Thread):
                     self.next_lab.config(text='Please take your meds!')
                 elif item == 'dispensing':
                     self.next_lab.config(text='Dispensing...')
-                elif item == 'travel':
+                elif item == 'dispense-travel':
                     self.next_lab.config(text='Travel Pack...')
                 elif item.split(':')[0] == 'snooze':
                     self.next_lab.config(text='Snoozes Left: '+item.split(':')[1])
+                elif item == 'finished':
+                    self.top.config(text='Load In')
+                    self.med.config(text='')
+                    self.low.config(text='Load Complete')
+                    self.next_lab.config(text='Please Wait')
             else:
                 print('a')
                 continue
@@ -107,7 +112,7 @@ def main():
 ##    lab.pack()
 
     next_lab = Label(root,
-                     text = 'Please wait',
+                     text = 'Please Wait',
                      fg = 'yellow',
                      bg = 'red',
                      font = "Helvetica 40 bold")
