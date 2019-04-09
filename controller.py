@@ -37,6 +37,8 @@ SNOOZE = 13
 TRAVEL = 7
 LOAD = 11
 LOAD_COMPLETE = 7
+PROXIMITY = 10
+GET_BACK = 13
 
 
 redisClient = redis.Redis()
@@ -84,11 +86,11 @@ def listen():
                 
                 if item == 'new': # indicates that a new regimen is available
                     print('new')
-##                    reg = []
-##                    finished = True
-##                    break
-                    redisPublisher.publish("This is main","yes")
-                    continue
+                    reg = []
+                    finished = True
+                    break
+##                    redisPublisher.publish("This is main","yes")
+##                    continue
 
                 next_dosage, next_x_2 = None, None
                 regs = item.split(":")
@@ -100,6 +102,7 @@ def listen():
                     next_dosage = regs[0]
                     next_x_2 = None
                     later_reg = None
+                
                 redisPublisher.publish("This is main","next:" + next_dosage)
                 temp_reg = next_dosage.split()
                 print('Medication Regimen Received')
@@ -230,6 +233,7 @@ def run():
             if release == 0:
                 release = 1
                 os.system("mpg123 http://ice1.somafm.com/u80s-128-mp3 &")
+##                current_reg = datetime.datetime(2099,12, 31)
                 
         if release == 1:
             time_to_next = TIME_LIMIT
@@ -257,8 +261,10 @@ def run():
                 non_adherence = 0
                 release = 0 # Set the release flag back to 0
                 reg = []
+                current_reg = datetime.datetime(2099,12, 31)
                 redisPublisher.publish("This is main","yes")
                 Snooze_Count = 0
+                print('abcde')
 ##                break
 
             elif GPIO.input(SNOOZE) == GPIO.HIGH:
@@ -297,9 +303,17 @@ def run():
                 non_adherence = 0  #Reset the non adherence flag
                 reg = [] #Clear the regimen
                 release = 0
+                current_reg = datetime.datetime(2099,12, 31)
                 redisPublisher.publish("This is main","yes")
 ##                break
 
+def load_in():
+    
+    while GPIO.input(PROXIMITY) == GPIO.HIGH:
+        if GPIO.input(LOAD) == GPIO.HIGH:
+            load_cut.rollforward()
+        elif GPIO.input(GET_BACK) == GPIO.HIGH:
+            load_cut.rollback()
 
 while True:
     GPIO.setwarnings(False)
@@ -307,10 +321,15 @@ while True:
     GPIO.setup(DISPENSE, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining dispense button
     GPIO.setup(SNOOZE, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining snooze button
     GPIO.setup(TRAVEL, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining travel pack button
+    GPIO.setup(PROXIMITY, GPIO.IN, pull_up_down=GPIO.PUD_DOWN) # defining proximity sensor
     try:
+        load_in()
+               
         while GPIO.input(LOAD_COMPLETE) != GPIO.HIGH:
-            if GPIO.input(LOAD) == GPIO.HIGH: # Load medication button is pressed
-                load_cut.rollforward()
+            if GPIO.input(GET_BACK) == GPIO.HIGH:
+                load_cut.rollback()
+                load_in()
+        
         redisPublisher.publish("This is main","Loaded")
         finished = False
         time.sleep(3)

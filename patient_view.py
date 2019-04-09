@@ -55,7 +55,8 @@ class MyApp(threading.Thread):
                 elif item[:4] == 'next':
                     reg = item[6:].split()
                     reg = datetime.datetime(*[int(i) for i in reg])
-                    reg = reg.strftime("Next Dosage: %H:%M:%S")
+                    reg = reg.ctime()
+##                    reg = reg.strftime("Next Dosage: %H:%M:%S")
                     self.next_lab.config(text=reg)
                 elif item == 'discarding':
                     self.next_lab.config(text='Discarding old meds...')
@@ -89,15 +90,15 @@ class MyApp(threading.Thread):
 def main():    
     root = Tk()
     helv36 = tkinter.font.Font(family='Helvetica', size=70, weight='bold')
-##    root.attributes('-fullscreen', True)
+    root.attributes('-fullscreen', True)
     guistr = StringVar()
     x1 = Label(root, textvariable=guistr)
     x1.config(font=('Helvetica',20,'bold'))
 
 
-    top = Button(root, text='Load In', font = helv36, command=Dispense)
+    top = Button(root, text='Start Load', font = helv36, command=Dispense)
     top.pack(side=TOP, anchor=W)
-    med = Button(root, text='', font = helv36, command=Snooze)
+    med = Button(root, text='Escape', font = helv36, command=Snooze)
     med.place(relx=0.0, rely=0.5, anchor=NW)
     low = Button(root, text='Load Complete', font = helv36, command=Travel)
     low.pack(side=BOTTOM, anchor=W)
