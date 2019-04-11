@@ -203,6 +203,7 @@ def run():
                 print('Activate the non-adherence mechanism for invalid medication')
                 nonad_motor.run_forward()
                 load_cut.run_dispense()
+                time.sleep(1)
                 nonad_motor.run_backward()
                 invalid_counter -= 1
 ##                redisPublisher.publish("This is main","Nonad-run") #send the non-adherence data
@@ -298,6 +299,7 @@ def run():
                 os.system('killall -9 mpg123')
                 nonad_motor.run_forward()
                 load_cut.run_dispense()
+                time.sleep(1)
                 nonad_motor.run_backward()
 ##                data_logger[str(str(time.asctime()))] = 'not adhere' #store the data logger in the dictionary
                 redisPublisher.publish("This is main","Nonad-run") #send the non-adherence data

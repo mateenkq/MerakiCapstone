@@ -42,8 +42,8 @@ def output_times(start, end, list_of_times):
     while curr_day < end:
         for j in list_of_times:
             new_time = curr_day + timedelta(hours=j)
-            ret_list.append(new_time)
+            ret_list.append((new_time,list_of_times.index(j)+1))
         curr_day = curr_day + timedelta(days=1)
     ret_list.sort()
-    ret_list = [str(x.year)+' '+str(x.month)+' '+str(x.day)+' '+str(x.hour)+' '+str(x.minute) for x in ret_list]
+    ret_list = [str(x[0].year)+' '+str(x[0].month)+' '+str(x[0].day)+' '+str(x[0].hour)+' '+str(x[0].minute)+' ' + str(x[1]) for x in ret_list]
     return ret_list

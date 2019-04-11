@@ -36,7 +36,8 @@ result = None
 missed = None # the number of meds missed
 taken = None # the number of meds taken at the right time
 new_result = None
-
+missed_list = None
+taken_list = None
 # old data may be stored in onboard memory. See if it's there, if not initialize missed and taken
 # to be 0
 try:
@@ -47,12 +48,16 @@ try:
     result = data['reg']
     new_result = data['new_reg']
     consecutive_misses = data['consecutive_misses']
+    missed_list = data['missed_list']
+    taken_list = data['taken_list']
     fh.close()
 except FileNotFoundError:
     missed = 0
     taken = 0
     consecutive_misses = 0
     new_result = []
+    missed_list = [0,0,0,0,0]
+    taken_list = [0,0,0,0,0]
 
 
 #Changes need to be made:
@@ -93,6 +98,11 @@ def on_message(client, userdata, message):
     global result
     global new_result
     global input_dict
+    global taken
+    global missed
+    global consecutive_misses
+    global missed_list
+    global taken_list
 
     NEW_REGIMEN = True # ---> not doing anything yet, make it useful
 
@@ -176,7 +186,9 @@ def on_message(client, userdata, message):
                 'meds_taken':taken,
                 'reg':result,
                 'new_reg':new_result,
-                'consecutive_misses':consecutive_misses
+                'consecutive_misses':consecutive_misses,
+                'missed_list':missed_list,
+                'taken_list':taken_list
                 }
             with open('data.json', 'w') as outfile:
                 json.dump(local_msg, outfile)
@@ -269,8 +281,11 @@ if __name__ == "__main__":
                                     if item == 'invalid':
                                         consecutive_misses += 1
                                         missed += 1
+                                        dosage_index = 0
                                         with lock:
-                                            result.pop(0)
+                                            a = result.pop(0)
+                                            dosage_index = int(a[-1])
+                                            missed_list[dosage_index] += 1
                                             if len(result) == 0:
                                                 redisClient.publish("wireless", "finished")
                                                 if len(new_result > 0):
@@ -282,7 +297,9 @@ if __name__ == "__main__":
                                                         'meds_taken':taken,
                                                         'reg':result,
                                                         'new_reg':new_result,
-                                                        'consecutive_misses':consecutive_misses
+                                                        'consecutive_misses':consecutive_misses,
+                                                        'missed_list':missed_list,
+                                                        'taken_list':taken_list
                                                         }
                                                     with open('data.json', 'w') as outfile:
                                                         json.dump(local_msg, outfile)
@@ -292,6 +309,11 @@ if __name__ == "__main__":
                                         adherence_msg = {
                                             'variable':'meds_missed',
                                             'value':missed
+                                            }
+                                        client.publish('tago/data/post', payload=json.dumps(adherence_msg))
+                                        adherence_msg = {
+                                            'variable':'missed_{}'.format(dosage_index),
+                                            'value':missed_list[dosage_index]
                                             }
 
                                         client.publish('tago/data/post', payload=json.dumps(adherence_msg))
@@ -305,7 +327,9 @@ if __name__ == "__main__":
                                             'meds_taken':taken,
                                             'reg':result,
                                             'new_reg':new_result,
-                                            'consecutive_misses':consecutive_misses
+                                            'consecutive_misses':consecutive_misses,
+                                            'taken_list':taken_list,
+                                            'missed_list':missed_list
                                             }
                                         with open('data.json', 'w') as outfile:
                                             json.dump(local_msg, outfile)
@@ -326,8 +350,11 @@ if __name__ == "__main__":
                                     if item == 'invalid':
                                         consecutive_misses += 1
                                         missed += 1
+                                        dosage_index = 0
                                         with lock:
-                                            result.pop(0)
+                                            a = result.pop(0)
+                                            dosage_index = int(a[-1])
+                                            missed_list[dosage_index] += 1
                                             if len(result) == 0:
                                                 redisClient.publish("wireless", "finished")
                                                 if len(new_result > 0):
@@ -339,7 +366,9 @@ if __name__ == "__main__":
                                                         'meds_taken':taken,
                                                         'reg':result,
                                                         'new_reg':new_result,
-                                                        'consecutive_misses':consecutive_misses
+                                                        'consecutive_misses':consecutive_misses,
+                                                        'taken_list':taken_list,
+                                                        'missed_list':missed_list
                                                         }
                                                     with open('data.json', 'w') as outfile:
                                                         json.dump(local_msg, outfile)
@@ -357,12 +386,20 @@ if __name__ == "__main__":
                                             'value':consecutive_misses
                                             }
                                         client.publish('tago/data/post', payload=json.dumps(adherence_msg))
+                                        adherence_msg = {
+                                            'variable':'missed_{}'.format(dosage_index),
+                                            'value':missed_list[dosage_index]
+                                            }
+
+                                        client.publish('tago/data/post', payload=json.dumps(adherence_msg))
                                         local_msg = {
                                             'meds_missed':missed,
                                             'meds_taken':taken,
                                             'reg':result,
                                             'new_reg':new_result,
-                                            'consecutive_misses':consecutive_misses
+                                            'consecutive_misses':consecutive_misses,
+                                            'missed_list':missed_list,
+                                            'taken_list':taken_list
                                             }
                                         with open('data.json', 'w') as outfile:
                                             json.dump(local_msg, outfile)
@@ -414,8 +451,11 @@ if __name__ == "__main__":
                     elif item == 'Nonad-run':
                         missed += 1
                         consecutive_misses += 1
+                        dosage_index = 0
                         with lock:
-                            result.pop(0)
+                            a = result.pop(0)
+                            dosage_index = a[-1]
+                            missed_list[dosage_index] += 1
                             if len(result) == 0:
                                 redisClient.publish("wireless", "finished")
                                 if len(new_result) > 0:
@@ -428,7 +468,9 @@ if __name__ == "__main__":
                                         'meds_taken':taken,
                                         'reg':result,
                                         'new_reg':new_result,
-                                        'consecutive_misses':consecutive_misses
+                                        'consecutive_misses':consecutive_misses,
+                                        'missed_list':missed_list,
+                                        'taken_list':taken_list
                                         }
                                     with open('data.json', 'w') as outfile:
                                         json.dump(local_msg, outfile)
@@ -444,13 +486,22 @@ if __name__ == "__main__":
                             'value':consecutive_misses
                             }
                         client.publish('tago/data/post', payload=json.dumps(adherence_msg))
+                        adherence_msg = {
+                            'variable':'missed_{}'.format(dosage_index),
+                            'value':missed_list[dosage_index]
+                            }
+
+                        
+                        client.publish('tago/data/post', payload=json.dumps(adherence_msg))
 
                         local_msg = {
                             'meds_missed':missed,
                             'meds_taken':taken,
                             'reg':result,
                             'new_reg':new_result,
-                            'consecutive_misses':consecutive_misses
+                            'consecutive_misses':consecutive_misses,
+                            'missed_list':missed_list,
+                            'taken_list':taken_list
                             }
                         with open('data.json', 'w') as outfile:
                             json.dump(local_msg, outfile)
@@ -458,8 +509,11 @@ if __name__ == "__main__":
                     elif item == 'Medrun':
                         consecutive_misses = 0
                         taken += 1
+                        dosage_index = 0
                         with lock:
-                            result.pop(0)
+                            a = result.pop(0)
+                            dosage_index = a[-1]
+                            taken_list[dosage_index] += 1
                             if len(result) == 0:
                                 redisClient.publish("wireless", "finished")
                                 if len(new_result) > 0:
@@ -472,7 +526,9 @@ if __name__ == "__main__":
                                         'meds_taken':taken,
                                         'reg':result,
                                         'new_reg':new_result,
-                                        'consecutive_misses':consecutive_misses
+                                        'consecutive_misses':consecutive_misses,
+                                        'missed_list':missed_list,
+                                        'taken_list':taken_list
                                         }
                                     with open('data.json', 'w') as outfile:
                                         json.dump(local_msg, outfile)
@@ -485,13 +541,23 @@ if __name__ == "__main__":
                             'variable':'meds_taken',
                             'value':taken
                             }
+
+                        client.publish('tago/data/post', payload=json.dumps(adherence_msg))
+                        adherence_msg = {
+                            'variable':'taken_{}'.format(dosage_index),
+                            'value':taken_list[dosage_index]
+                            }
+
+                        
                         client.publish('tago/data/post', payload=json.dumps(adherence_msg))
                         local_msg = {
                             'meds_missed':missed,
                             'meds_taken':taken,
                             'reg':result,
                             'new_reg':new_result,
-                            'consecutive_misses':consecutive_misses
+                            'consecutive_misses':consecutive_misses,
+                            'taken_list':taken_list,
+                            'missed_list':missed_list
                             }
                         with open('data.json', 'w') as outfile:
                             json.dump(local_msg, outfile)
