@@ -229,6 +229,7 @@ def run():
         if len(reg) > 0:
             current_reg = datetime.datetime(*[int(i) for i in reg])
         if datetime.datetime.now() > current_reg:
+            print(reg)
             redisPublisher.publish("This is main","can_dispense")
             if release == 0:
                 release = 1
