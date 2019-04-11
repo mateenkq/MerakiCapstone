@@ -24,7 +24,7 @@ pubsub.subscribe("This is main")
 
 #The input dict is initialized with a base structure, and is
 #filled as we get data from the Tago platform
-input_dict = {'period':'', 'times':[], 'dosages':0}
+input_dict = {'period':'', 'times':[], 'dosages':0, 'overwrite':None}
 
 #TODO --- > If NEW_REGIMEN is True, then input dict will be reinitialized
 NEW_REGIMEN = False
@@ -33,6 +33,7 @@ Connected = False
 result = None
 missed = None # the number of meds missed
 taken = None # the number of meds taken at the right time
+new_result = None
 
 # old data may be stored in onboard memory. See if it's there, if not initialize missed and taken
 # to be 0
@@ -42,10 +43,12 @@ try:
     missed = data['meds_missed']
     taken = data['meds_taken']
     result = data['reg']
+    new_result = data['new_reg']
     fh.close()
 except FileNotFoundError:
     missed = 0
     taken = 0
+    new_result = []
 
 
 #Changes need to be made:
@@ -84,6 +87,7 @@ def on_message(client, userdata, message):
     """
     
     global result
+    global new_result
     global input_dict
 
     NEW_REGIMEN = True # ---> not doing anything yet, make it useful
@@ -110,16 +114,22 @@ def on_message(client, userdata, message):
     # than the actual number of dosage times sent, at some point they'll be both equal within input_dict
     # which will satisfy the conditions of the control logic below. ---> FIX THIS!
     
-    if input_dict['period'] != '' and len(input_dict['times']) != 0 and input_dict['dosages'] != 0:
+    if input_dict['period'] != '' and len(input_dict['times']) != 0 and input_dict['dosages'] != 0 and input_dict['overwrite'] != None:
         if len(input_dict['times']) == int(input_dict['dosages']):
             
             start, end, list_of_times = parse_input(input_dict)
             print('result is {}'.format(result))
-            with lock:
-                result = output_times(start, end, list_of_times)
-                print('result is {}'.format(result))
-                input_dict = {'period':'', 'times':[], 'dosages':0}
-    ##            send_msg = {
+            if input_dict['overwrite'] == 'no':
+                new_result = output_times(start,end,list_of_times)
+            if result == None or len(result) == 0 or input_dict['overwrite'] == 'yes':
+                with lock:
+                    result = output_times(start, end, list_of_times)
+                    print('a')
+                    new_result = []
+                    print('result is {}'.format(result))
+                    redisClient.publish("wireless", 'new')
+            input_dict = {'period':'', 'times':[], 'dosages':0, 'overwrite':None}
+        ##            send_msg = {
     ##                'variable': "recv_data",
     ##                'value': "Yes"
     ##            }
@@ -128,33 +138,44 @@ def on_message(client, userdata, message):
 
                 #reinitialize taken and missed meds
 
-                
-                adherence_msg = {
-                    'variable':'meds_taken',
-                    'value':taken
-                    }
-                client.publish('tago/data/post', payload=json.dumps(adherence_msg))
-
-                adherence_msg = {
-                    'variable':'meds_missed',
-                    'value':missed
-                    }
-                client.publish('tago/data/post', payload=json.dumps(adherence_msg))
-
-                send_msg = {
-                    'variable': 'dosages_match',
-    ##                'value': 'Success!'
-                    'value':'.'
+            
+            adherence_msg = {
+                'variable':'meds_taken',
+                'value':taken
                 }
-                redisClient.publish("wireless", 'new')
-                for i in range(5):
-                    client.publish("tago/data/post", payload=json.dumps(send_msg))
+            client.publish('tago/data/post', payload=json.dumps(adherence_msg))
+
+            adherence_msg = {
+                'variable':'meds_missed',
+                'value':missed
+                }
+            client.publish('tago/data/post', payload=json.dumps(adherence_msg))
+
+            send_msg = {
+                'variable': 'dosages_match',
+##                'value': 'Success!'
+                'value':'.'
+            }
+            
+            for i in range(5):
+                client.publish("tago/data/post", payload=json.dumps(send_msg))
 
             send_msg = {
                 'variable': "meds_loaded",
                 'value': "Meds Have not been loaded yet. Please wait.."
             }
             client.publish("tago/data/post", payload=json.dumps(send_msg))
+            print('result is ', result)
+            print('new result is ', new_result)
+            local_msg = {
+                'meds_missed':missed,
+                'meds_taken':taken,
+                'reg':result,
+                'new_reg':new_result
+                }
+            with open('data.json', 'w') as outfile:
+                json.dump(local_msg, outfile)
+                outfile.close()
 
             
         else:
@@ -214,6 +235,8 @@ if __name__ == "__main__":
     while True:
         try:
             for item in pubsub.listen():
+                print(result)
+                print(new_result)
                 print(item)
                 if type(item['data']) is not int:
                     item = str(item['data'],'utf-8')
@@ -245,6 +268,20 @@ if __name__ == "__main__":
                                             result.pop(0)
                                             if len(result) == 0:
                                                 redisClient.publish("wireless", "finished")
+                                                if len(new_result > 0):
+                                                    result = new_result
+                                                    print('a')
+                                                    new_result = []
+                                                    local_msg = {
+                                                        'meds_missed':missed,
+                                                        'meds_taken':taken,
+                                                        'reg':result,
+                                                        'new_reg':new_result
+                                                        }
+                                                    with open('data.json', 'w') as outfile:
+                                                        json.dump(local_msg, outfile)
+                                                        outfile.close()
+                                                    
                                                 break
                                         adherence_msg = {
                                             'variable':'meds_missed',
@@ -255,7 +292,8 @@ if __name__ == "__main__":
                                         local_msg = {
                                             'meds_missed':missed,
                                             'meds_taken':taken,
-                                            'reg':result
+                                            'reg':result,
+                                            'new_reg':new_result
                                             }
                                         with open('data.json', 'w') as outfile:
                                             json.dump(local_msg, outfile)
@@ -280,6 +318,22 @@ if __name__ == "__main__":
                                             result.pop(0)
                                             if len(result) == 0:
                                                 redisClient.publish("wireless", "finished")
+                                                if len(new_result > 0):
+                                                    print('a')
+                                                    result = new_result
+                                                    new_result = []
+                                                    local_msg = {
+                                                        'meds_missed':missed,
+                                                        'meds_taken':taken,
+                                                        'reg':result,
+                                                        'new_reg':new_result
+                                                        }
+                                                    with open('data.json', 'w') as outfile:
+                                                        json.dump(local_msg, outfile)
+                                                        outfile.close()
+                                                    
+
+                                                
                                                 break
                                         adherence_msg = {
                                             'variable':'meds_missed',
@@ -290,7 +344,8 @@ if __name__ == "__main__":
                                         local_msg = {
                                             'meds_missed':missed,
                                             'meds_taken':taken,
-                                            'reg':result
+                                            'reg':result,
+                                            'new_reg':new_result
                                             }
                                         with open('data.json', 'w') as outfile:
                                             json.dump(local_msg, outfile)
@@ -345,6 +400,21 @@ if __name__ == "__main__":
                             result.pop(0)
                             if len(result) == 0:
                                 redisClient.publish("wireless", "finished")
+                                if len(new_result) > 0:
+                                    print('a')
+                                    result = new_result
+                                    print(result)
+                                    new_result = []
+                                    local_msg = {
+                                        'meds_missed':missed,
+                                        'meds_taken':taken,
+                                        'reg':result,
+                                        'new_reg':new_result
+                                        }
+                                    with open('data.json', 'w') as outfile:
+                                        json.dump(local_msg, outfile)
+                                        outfile.close()
+                                    print(local_msg)
                         adherence_msg = {
                             'variable':'meds_missed',
                             'value':missed
@@ -354,7 +424,8 @@ if __name__ == "__main__":
                         local_msg = {
                             'meds_missed':missed,
                             'meds_taken':taken,
-                            'reg':result
+                            'reg':result,
+                            'new_reg':new_result
                             }
                         with open('data.json', 'w') as outfile:
                             json.dump(local_msg, outfile)
@@ -365,6 +436,24 @@ if __name__ == "__main__":
                             result.pop(0)
                             if len(result) == 0:
                                 redisClient.publish("wireless", "finished")
+                                if len(new_result) > 0:
+                                    print('a')
+                                    result = new_result
+                                    print(result)
+                                    new_result = []
+                                    local_msg = {
+                                        'meds_missed':missed,
+                                        'meds_taken':taken,
+                                        'reg':result,
+                                        'new_reg':new_result
+                                        }
+                                    with open('data.json', 'w') as outfile:
+                                        json.dump(local_msg, outfile)
+                                        outfile.close()
+                                    print(local_msg)
+                                                    
+
+                                
                         adherence_msg = {
                             'variable':'meds_taken',
                             'value':taken
@@ -373,7 +462,8 @@ if __name__ == "__main__":
                         local_msg = {
                             'meds_missed':missed,
                             'meds_taken':taken,
-                            'reg':result
+                            'reg':result,
+                            'new_reg':new_result
                             }
                         with open('data.json', 'w') as outfile:
                             json.dump(local_msg, outfile)

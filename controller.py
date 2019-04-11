@@ -233,7 +233,7 @@ def run():
             redisPublisher.publish("This is main","can_dispense")
             if release == 0:
                 release = 1
-                os.system("mpg123 http://ice1.somafm.com/u80s-128-mp3 &")
+##                os.system("mpg123 http://ice1.somafm.com/u80s-128-mp3 &")
 ##                current_reg = datetime.datetime(2099,12, 31)
                 
         if release == 1:
