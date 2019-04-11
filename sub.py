@@ -30,6 +30,8 @@ input_dict = {'period':'', 'times':[], 'dosages':0, 'overwrite':None}
 NEW_REGIMEN = False
 Connected = False
 
+
+consecutive_misses = None
 result = None
 missed = None # the number of meds missed
 taken = None # the number of meds taken at the right time
@@ -44,10 +46,12 @@ try:
     taken = data['meds_taken']
     result = data['reg']
     new_result = data['new_reg']
+    consecutive_misses = data['consecutive_misses']
     fh.close()
 except FileNotFoundError:
     missed = 0
     taken = 0
+    consecutive_misses = 0
     new_result = []
 
 
@@ -171,7 +175,8 @@ def on_message(client, userdata, message):
                 'meds_missed':missed,
                 'meds_taken':taken,
                 'reg':result,
-                'new_reg':new_result
+                'new_reg':new_result,
+                'consecutive_misses':consecutive_misses
                 }
             with open('data.json', 'w') as outfile:
                 json.dump(local_msg, outfile)
@@ -262,7 +267,7 @@ if __name__ == "__main__":
                                 if type(item['data']) is not int:
                                     item = str(item['data'], 'utf-8')
                                     if item == 'invalid':
-
+                                        consecutive_misses += 1
                                         missed += 1
                                         with lock:
                                             result.pop(0)
@@ -276,7 +281,8 @@ if __name__ == "__main__":
                                                         'meds_missed':missed,
                                                         'meds_taken':taken,
                                                         'reg':result,
-                                                        'new_reg':new_result
+                                                        'new_reg':new_result,
+                                                        'consecutive_misses':consecutive_misses
                                                         }
                                                     with open('data.json', 'w') as outfile:
                                                         json.dump(local_msg, outfile)
@@ -287,13 +293,19 @@ if __name__ == "__main__":
                                             'variable':'meds_missed',
                                             'value':missed
                                             }
-                                        client.publish('tago/data/post', payload=json.dumps(adherence_msg))
 
+                                        client.publish('tago/data/post', payload=json.dumps(adherence_msg))
+                                        adherence_msg = {
+                                            'variable':'consecutive_misses',
+                                            'value':consecutive_misses
+                                            }
+                                        client.publish('tago/data/post', payload=json.dumps(adherence_msg))
                                         local_msg = {
                                             'meds_missed':missed,
                                             'meds_taken':taken,
                                             'reg':result,
-                                            'new_reg':new_result
+                                            'new_reg':new_result,
+                                            'consecutive_misses':consecutive_misses
                                             }
                                         with open('data.json', 'w') as outfile:
                                             json.dump(local_msg, outfile)
@@ -312,7 +324,7 @@ if __name__ == "__main__":
                                 if type(item['data']) is not int:
                                     item = str(item['data'], 'utf-8')
                                     if item == 'invalid':
-
+                                        consecutive_misses += 1
                                         missed += 1
                                         with lock:
                                             result.pop(0)
@@ -326,26 +338,31 @@ if __name__ == "__main__":
                                                         'meds_missed':missed,
                                                         'meds_taken':taken,
                                                         'reg':result,
-                                                        'new_reg':new_result
+                                                        'new_reg':new_result,
+                                                        'consecutive_misses':consecutive_misses
                                                         }
                                                     with open('data.json', 'w') as outfile:
                                                         json.dump(local_msg, outfile)
                                                         outfile.close()
-                                                    
-
                                                 
                                                 break
+                                            
                                         adherence_msg = {
                                             'variable':'meds_missed',
                                             'value':missed
                                             }
                                         client.publish('tago/data/post', payload=json.dumps(adherence_msg))
-
+                                        adherence_msg = {
+                                            'variable':'consecutive_misses',
+                                            'value':consecutive_misses
+                                            }
+                                        client.publish('tago/data/post', payload=json.dumps(adherence_msg))
                                         local_msg = {
                                             'meds_missed':missed,
                                             'meds_taken':taken,
                                             'reg':result,
-                                            'new_reg':new_result
+                                            'new_reg':new_result,
+                                            'consecutive_misses':consecutive_misses
                                             }
                                         with open('data.json', 'w') as outfile:
                                             json.dump(local_msg, outfile)
@@ -396,6 +413,7 @@ if __name__ == "__main__":
                            
                     elif item == 'Nonad-run':
                         missed += 1
+                        consecutive_misses += 1
                         with lock:
                             result.pop(0)
                             if len(result) == 0:
@@ -409,7 +427,8 @@ if __name__ == "__main__":
                                         'meds_missed':missed,
                                         'meds_taken':taken,
                                         'reg':result,
-                                        'new_reg':new_result
+                                        'new_reg':new_result,
+                                        'consecutive_misses':consecutive_misses
                                         }
                                     with open('data.json', 'w') as outfile:
                                         json.dump(local_msg, outfile)
@@ -420,17 +439,24 @@ if __name__ == "__main__":
                             'value':missed
                             }
                         client.publish('tago/data/post', payload=json.dumps(adherence_msg))
+                        adherence_msg = {
+                            'variable':'consecutive_misses',
+                            'value':consecutive_misses
+                            }
+                        client.publish('tago/data/post', payload=json.dumps(adherence_msg))
 
                         local_msg = {
                             'meds_missed':missed,
                             'meds_taken':taken,
                             'reg':result,
-                            'new_reg':new_result
+                            'new_reg':new_result,
+                            'consecutive_misses':consecutive_misses
                             }
                         with open('data.json', 'w') as outfile:
                             json.dump(local_msg, outfile)
                             outfile.close()
                     elif item == 'Medrun':
+                        consecutive_misses = 0
                         taken += 1
                         with lock:
                             result.pop(0)
@@ -445,7 +471,8 @@ if __name__ == "__main__":
                                         'meds_missed':missed,
                                         'meds_taken':taken,
                                         'reg':result,
-                                        'new_reg':new_result
+                                        'new_reg':new_result,
+                                        'consecutive_misses':consecutive_misses
                                         }
                                     with open('data.json', 'w') as outfile:
                                         json.dump(local_msg, outfile)
@@ -463,7 +490,8 @@ if __name__ == "__main__":
                             'meds_missed':missed,
                             'meds_taken':taken,
                             'reg':result,
-                            'new_reg':new_result
+                            'new_reg':new_result,
+                            'consecutive_misses':consecutive_misses
                             }
                         with open('data.json', 'w') as outfile:
                             json.dump(local_msg, outfile)
