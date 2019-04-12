@@ -108,7 +108,7 @@ class motor_driver_load_cut:
         try:
             self.MotorSpeedSetAB(0,69)
             self.MotorDirectionSet(0b1010)
-            time.sleep(5)
+            time.sleep(0.25)
             self.MotorSpeedSetAB(0,0)
         except IOError:
             print("Unable to find the motor driver, check the addrees and press reset on the motor driver and try again")

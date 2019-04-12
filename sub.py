@@ -109,8 +109,20 @@ def on_message(client, userdata, message):
     # convert incoming message to a string
     str_recv = ast.literal_eval(message.payload.decode())
 
+    if str_recv["variable"] == "connectivity":
+        adherence_msg = {
+            'variable':'system_connected',
+            'value':'Yes'
+            }
+        client.publish('tago/data/post', payload=json.dumps(adherence_msg))
+        time.sleep(2)
+        adherence_msg = {
+            'variable':'system_connected',
+            'value':''
+            }
+        client.publish('tago/data/post', payload=json.dumps(adherence_msg))        
     # Change the global variable input_dict based on the information received
-    if str(type(input_dict[str_recv["variable"]])) == "<class 'list'>":
+    elif str(type(input_dict[str_recv["variable"]])) == "<class 'list'>":
         input_dict[str_recv["variable"]].append(str_recv["value"])
     else:
 

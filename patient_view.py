@@ -52,9 +52,10 @@ class MyApp(threading.Thread):
                     self.top.config(text='Dispense')
                     self.med.config(text='Snooze')
                     self.low.config(text='Travel Pk')
+                    self.next_lab.config(text='Please Wait for Pharmacist')
                 elif item[:4] == 'next':
                     reg = item[6:].split()
-                    reg = datetime.datetime(*[int(i) for i in reg])
+                    reg = datetime.datetime(*[int(i) for i in reg[:5]])
                     reg = reg.ctime()
 ##                    reg = reg.strftime("Next Dosage: %H:%M:%S")
                     self.next_lab.config(text=reg)
@@ -71,10 +72,15 @@ class MyApp(threading.Thread):
                 elif item.split(':')[0] == 'snooze':
                     self.next_lab.config(text='Snoozes Left: '+item.split(':')[1])
                 elif item == 'finished':
-                    self.top.config(text='Load In')
+                    self.top.config(text='Reset')
                     self.med.config(text='')
-                    self.low.config(text='Load Complete')
+                    self.low.config(text='Load In')
                     self.next_lab.config(text='Please Wait')
+                elif item == 'Load-Confirmation':
+                    self.top.config(text='No(Reset)')
+                    self.med.config(text='')
+                    self.low.config(text='Yes')
+                    self.next_lab.config(text='New meds detected. Proceed?')
             else:
                 print('a')
                 continue
@@ -90,17 +96,17 @@ class MyApp(threading.Thread):
 def main():    
     root = Tk()
     helv36 = tkinter.font.Font(family='Helvetica', size=70, weight='bold')
-    root.attributes('-fullscreen', True)
+##    root.attributes('-fullscreen', True)
     guistr = StringVar()
     x1 = Label(root, textvariable=guistr)
     x1.config(font=('Helvetica',20,'bold'))
 
 
-    top = Button(root, text='Start Load', font = helv36, command=Dispense)
+    top = Button(root, text='Reset', font = helv36, command=Dispense)
     top.pack(side=TOP, anchor=W)
-    med = Button(root, text='Escape', font = helv36, command=Snooze)
+    med = Button(root, text='', font = helv36, command=Snooze)
     med.place(relx=0.0, rely=0.5, anchor=NW)
-    low = Button(root, text='Load Complete', font = helv36, command=Travel)
+    low = Button(root, text='Load In', font = helv36, command=Travel)
     low.pack(side=BOTTOM, anchor=W)
 
     
@@ -113,7 +119,7 @@ def main():
 ##    lab.pack()
 
     next_lab = Label(root,
-                     text = 'Please Wait',
+                     text = 'Please Load In Medication',
                      fg = 'yellow',
                      bg = 'red',
                      font = "Helvetica 40 bold")

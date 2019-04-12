@@ -35,10 +35,10 @@ TRAVEL_ALLOWED = False
 DISPENSE = 11
 SNOOZE = 13
 TRAVEL = 7
-LOAD = 11
+LOAD = 7
 LOAD_COMPLETE = 7
 PROXIMITY = 10
-GET_BACK = 13
+GET_BACK = 11
 
 
 redisClient = redis.Redis()
@@ -311,14 +311,29 @@ def run():
 ##                break
 
 def load_in():
-    
-    while GPIO.input(PROXIMITY) == GPIO.HIGH:
+    while True:
         if GPIO.input(LOAD) == GPIO.HIGH:
-            load_cut.rollforward()
+            while GPIO.input(PROXIMITY) == GPIO.HIGH and GPIO.input(GET_BACK) == GPIO.LOW:
+                load_cut.rollforward()
         elif GPIO.input(GET_BACK) == GPIO.HIGH:
             load_cut.rollback()
+            redisPublisher.publish("This is main","finished")
+        if GPIO.input(PROXIMITY) == GPIO.LOW:
+            print('a')
+            redisPublisher.publish("This is main","Load-Confirmation")
+            if GPIO.input(LOAD_COMPLETE) == GPIO.HIGH:
+                print('should break')
+                break
+    
+    
+##    while GPIO.input(PROXIMITY) == GPIO.HIGH:
+##        if GPIO.input(LOAD) == GPIO.HIGH:
+##            load_cut.rollforward()
+##        elif GPIO.input(GET_BACK) == GPIO.HIGH:
+##            load_cut.rollback()
 
 while True:
+    redisPublisher.publish("This is main","finished")
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BOARD)
     GPIO.setup(DISPENSE, GPIO.IN,pull_up_down=GPIO.PUD_DOWN) # defining dispense button
@@ -328,10 +343,10 @@ while True:
     try:
         load_in()
                
-        while GPIO.input(LOAD_COMPLETE) != GPIO.HIGH:
-            if GPIO.input(GET_BACK) == GPIO.HIGH:
-                load_cut.rollback()
-                load_in()
+##        while GPIO.input(LOAD_COMPLETE) != GPIO.HIGH:
+##            if GPIO.input(GET_BACK) == GPIO.HIGH:
+##                load_cut.rollback()
+##                load_in()
         
         redisPublisher.publish("This is main","Loaded")
         finished = False
