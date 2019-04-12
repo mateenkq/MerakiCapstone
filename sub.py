@@ -454,7 +454,7 @@ if __name__ == "__main__":
                         dosage_index = 0
                         with lock:
                             a = result.pop(0)
-                            dosage_index = a[-1]
+                            dosage_index = int(a[-1])
                             missed_list[dosage_index] += 1
                             if len(result) == 0:
                                 redisClient.publish("wireless", "finished")
@@ -512,7 +512,7 @@ if __name__ == "__main__":
                         dosage_index = 0
                         with lock:
                             a = result.pop(0)
-                            dosage_index = a[-1]
+                            dosage_index = int(a[-1])
                             taken_list[dosage_index] += 1
                             if len(result) == 0:
                                 redisClient.publish("wireless", "finished")
