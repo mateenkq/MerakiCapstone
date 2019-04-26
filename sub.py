@@ -51,7 +51,7 @@ try:
     missed_list = data['missed_list']
     taken_list = data['taken_list']
     fh.close()
-except FileNotFoundError:
+except (FileNotFoundError, KeyError) as e:
     missed = 0
     taken = 0
     consecutive_misses = 0
@@ -154,6 +154,21 @@ def on_message(client, userdata, message):
                     new_result = []
                     print('result is {}'.format(result))
                     redisClient.publish("wireless", 'new')
+                    missed_list = [0,0,0,0,0]
+                    taken_list = [0,0,0,0,0]
+                for i in range(5):
+                    adherence_msg = {
+                        'variable':'missed_{}'.format(i),
+                        'value':missed_list[i]
+                        } 
+                    client.publish('tago/data/post', payload=json.dumps(adherence_msg))
+
+                    adherence_msg = {
+                        'variable':'taken_{}'.format(i),
+                        'value':taken_list[i]
+                        } 
+                    client.publish('tago/data/post', payload=json.dumps(adherence_msg))                    
+                        
             input_dict = {'period':'', 'times':[], 'dosages':0, 'overwrite':None}
         ##            send_msg = {
     ##                'variable': "recv_data",
@@ -240,8 +255,10 @@ def mqtt_listen():
     client.on_connect = on_connect
     client.on_message = on_message
 
-
-    client.connect(broker_address, port=port)
+    try:
+        client.connect(broker_address, port=port)
+    except:
+        pass
     client.subscribe("tago/test")
     client.loop_forever()
     while Connected != True:
@@ -300,7 +317,7 @@ if __name__ == "__main__":
                                             missed_list[dosage_index] += 1
                                             if len(result) == 0:
                                                 redisClient.publish("wireless", "finished")
-                                                if len(new_result > 0):
+                                                if len(new_result) > 0:
                                                     result = new_result
                                                     print('a')
                                                     new_result = []

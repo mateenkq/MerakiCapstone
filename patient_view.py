@@ -54,18 +54,31 @@ class MyApp(threading.Thread):
                     self.low.config(text='Travel Pk')
                     self.next_lab.config(text='Please Wait for Pharmacist')
                 elif item[:4] == 'next':
+                    self.top.config(text='Dispense')
+                    self.med.config(text='Snooze')
+                    self.low.config(text='Travel Pk')
                     reg = item[6:].split()
                     reg = datetime.datetime(*[int(i) for i in reg[:5]])
                     reg = reg.ctime()
 ##                    reg = reg.strftime("Next Dosage: %H:%M:%S")
-                    self.next_lab.config(text=reg)
+                    self.next_lab.config(text='Next Dosage:\n'+str(reg))
                 elif item == 'discarding':
+                    self.top.config(text='Dispense')
+                    self.med.config(text='Snooze')
+                    self.low.config(text='Travel Pk')
                     self.next_lab.config(text='Discarding old meds...')
-                    time.sleep(10)
+                    time.sleep(3)
                     self.next_lab.config(text=reg)
+                    
                 elif item == 'can_dispense':
+                    self.top.config(text='Dispense')
+                    self.med.config(text='Snooze')
+                    self.low.config(text='Travel Pk')
                     self.next_lab.config(text='Please take your meds!')
                 elif item == 'dispensing':
+                    self.top.config(text='Dispense')
+                    self.med.config(text='Snooze')
+                    self.low.config(text='Travel Pk')
                     self.next_lab.config(text='Dispensing...')
                 elif item == 'dispense-travel':
                     self.next_lab.config(text='Travel Pack...')
@@ -75,7 +88,7 @@ class MyApp(threading.Thread):
                     self.top.config(text='Reset')
                     self.med.config(text='')
                     self.low.config(text='Load In')
-                    self.next_lab.config(text='Please Wait')
+                    self.next_lab.config(text='Old regimen finished!\nLoad New!')
                 elif item == 'Load-Confirmation':
                     self.top.config(text='No(Reset)')
                     self.med.config(text='')
@@ -96,7 +109,7 @@ class MyApp(threading.Thread):
 def main():    
     root = Tk()
     helv36 = tkinter.font.Font(family='Helvetica', size=70, weight='bold')
-##    root.attributes('-fullscreen', True)
+    root.attributes('-fullscreen', True)
     guistr = StringVar()
     x1 = Label(root, textvariable=guistr)
     x1.config(font=('Helvetica',20,'bold'))

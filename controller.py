@@ -234,7 +234,8 @@ def run():
             redisPublisher.publish("This is main","can_dispense")
             if release == 0:
                 release = 1
-##                os.system("mpg123 http://ice1.somafm.com/u80s-128-mp3 &")
+                os.system("mpg123 http://ice1.somafm.com/u80s-128-mp3 &")
+                time.sleep(5)
 ##                current_reg = datetime.datetime(2099,12, 31)
                 
         if release == 1:
@@ -319,7 +320,6 @@ def load_in():
             load_cut.rollback()
             redisPublisher.publish("This is main","finished")
         if GPIO.input(PROXIMITY) == GPIO.LOW:
-            print('a')
             redisPublisher.publish("This is main","Load-Confirmation")
             if GPIO.input(LOAD_COMPLETE) == GPIO.HIGH:
                 print('should break')
@@ -347,7 +347,7 @@ while True:
 ##            if GPIO.input(GET_BACK) == GPIO.HIGH:
 ##                load_cut.rollback()
 ##                load_in()
-        
+##        for i in range(20):
         redisPublisher.publish("This is main","Loaded")
         finished = False
         time.sleep(3)

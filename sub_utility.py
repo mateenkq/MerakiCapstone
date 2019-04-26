@@ -20,7 +20,8 @@ def parse_input(input_dict):
     end = end.replace('End:', '').split(' GMT')[0]
     start = datetime.strptime(start, ' %a %b %d %Y %H:%M:%S')
     end = datetime.strptime(end, ' %a %b %d %Y %H:%M:%S')
-    times = [int(x) for x in input_dict['times']]
+    times = [x.split(':') for x in input_dict['times']]
+    times = [(int(x[0]), int(x[1])) for x in times]
     return start, end, times
     
 def output_times(start, end, list_of_times):
@@ -41,7 +42,8 @@ def output_times(start, end, list_of_times):
     ret_list = []
     while curr_day < end:
         for j in list_of_times:
-            new_time = curr_day + timedelta(hours=j)
+            hrs, mins = j[0], j[1]
+            new_time = curr_day + timedelta(minutes=mins,hours=hrs)
             ret_list.append((new_time,list_of_times.index(j)+1))
         curr_day = curr_day + timedelta(days=1)
     ret_list.sort()
