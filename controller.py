@@ -320,10 +320,11 @@ def load_in():
             load_cut.rollback()
             redisPublisher.publish("This is main","finished")
         if GPIO.input(PROXIMITY) == GPIO.LOW:
-            redisPublisher.publish("This is main","Load-Confirmation")
+##            redisPublisher.publish("This is main","Load-Confirmation")
             if GPIO.input(LOAD_COMPLETE) == GPIO.HIGH:
+                redisPublisher.publish("This is main","Loaded")
                 print('should break')
-                break
+                return
     
     
 ##    while GPIO.input(PROXIMITY) == GPIO.HIGH:
@@ -348,6 +349,7 @@ while True:
 ##                load_cut.rollback()
 ##                load_in()
 ##        for i in range(20):
+        print('a')
         redisPublisher.publish("This is main","Loaded")
         finished = False
         time.sleep(3)
